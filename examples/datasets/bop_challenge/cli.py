@@ -1,0 +1,1 @@
+blenderproc run examples/datasets/bop_challenge/main_lm_upright_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000

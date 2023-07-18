@@ -1,5 +1,4 @@
-""" Downloads the ikea dataset """
-
+import blenderproc as bproc
 import os
 import glob
 import subprocess

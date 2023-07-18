@@ -53,9 +53,11 @@ bproc.camera.add_camera_pose(cam2world)
 
 # activate depth rendering
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
+bproc.renderer.enable_normals_output()
 
 # render the whole pipeline
 data = bproc.renderer.render()
 
 # Write object poses, color and depth in bop format
+bproc.writer.write_hdf5(args.output_dir, data)
 bproc.writer.write_bop(args.output_dir, [obj], data["depth"], data["colors"], m2mm=True, append_to_existing_output=True)

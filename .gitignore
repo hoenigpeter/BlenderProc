@@ -31,3 +31,7 @@ docs/source/images/
 docs/source/examples/
 docs/source/*md
 blenderproc_resources/
+*.usdc
+*.usda
+*.jpg
+*.png
