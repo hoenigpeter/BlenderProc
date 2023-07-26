@@ -3,7 +3,7 @@ import argparse
 import os
 import numpy as np
 import copy 
-#python rerun.py run examples/datasets/bop_challenge/main_lm_upright_3r_1o.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_tless_random_7r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -21,7 +21,7 @@ cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
 
 cc_textures_list = []
 for i in range(30):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_3r/" + str(i))
+    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_7r/" + str(i))
     print("Folder: ", i)
     print("Textures: ", len(temp))
     print()
@@ -57,6 +57,9 @@ room_planes = [bproc.object.create_primitive('PLANE', scale=[2, 2, 1]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[2, 0, 2], rotation=[0, -1.570796, 0]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[-2, 0, 2], rotation=[0, 1.570796, 0])]
 
+for plane in room_planes:
+    plane.enable_rigidbody(False, collision_shape='BOX', mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
+
 # sample light color and strenght from ceiling
 light_plane = bproc.object.create_primitive('PLANE', scale=[3, 3, 1], location=[0, 0, 10])
 light_plane.set_name('light_plane')
@@ -64,7 +67,7 @@ light_plane_material = bproc.material.create('light_material')
 
 # sample point light on shell
 light_point = bproc.types.Light()
-light_point.set_energy(200)
+light_point.set_energy(100)
 
 # Define a function that samples 6-DoF poses
 def sample_pose_func(obj: bproc.types.MeshObject):
@@ -98,25 +101,19 @@ for i in range(args.num_scenes):
         print("obj texture: ", obj.get_materials()[0].blender_obj.name)
         print("idx: ", idx, " scene_cnt: ", scene_cnt)
         print("cc_textures_list: ", len(cc_textures_list[idx]))
+    
+        #if obj.get_cp("bop_dataset_name") == 'lm':
+        cc_texture_from_list = cc_textures_list[idx][scene_cnt - 1]
+        obj.replace_materials(cc_texture_from_list)
         mat = obj.get_materials()[0]
-        if scene_cnt > 0:       
-            #if obj.get_cp("bop_dataset_name") == 'lm':
-            cc_texture_from_list = cc_textures_list[idx][scene_cnt - 1]
-            obj.replace_materials(cc_texture_from_list)
-            mat = obj.get_materials()[0]
-            mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-            mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
-        else:
-            mat = obj.get_materials()[0]
-            grey_col = np.random.uniform(0.1, 0.9)   
-            mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
-            mat.set_principled_shader_value("Specular", np.random.uniform(0.3, 1.0))
-            mat.set_principled_shader_value("Metallic", np.random.uniform(0, 0.5))                    
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))                    
 
         if not obj.has_uv_mapping():
             obj.add_uv_mapping("smart")
 
         mat.set_principled_shader_value("Alpha", 1.0)
+        obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
 
     for idx, obj in enumerate(sampled_distractor_bop_objs):       
@@ -126,6 +123,7 @@ for i in range(args.num_scenes):
             mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
         mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
         mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
     
     # Sample two light sources
@@ -143,45 +141,32 @@ for i in range(args.num_scenes):
         plane.replace_materials(random_cc_texture)
 
 
-    # Sample object poses and check collisions 
     bproc.object.sample_poses(objects_to_sample = sampled_target_bop_objs + sampled_distractor_bop_objs,
-    #bproc.object.sample_poses(objects_to_sample = sampled_target_bop_objs,
                             sample_pose_func = sample_pose_func, 
                             max_tries = 1000)
             
-    # Define a function that samples the initial pose of a given object above the ground
-    def sample_initial_pose(obj: bproc.types.MeshObject):
-        obj.set_location(bproc.sampler.upper_region(objects_to_sample_on=room_planes[0:1],
-                                                    min_height=1, max_height=4, face_sample_range=[0.4, 0.6]))
-        obj.set_rotation_euler(np.random.uniform([0, 0, 0], [0, 0, np.pi * 2]))
+    # Physics Positioning
+    bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=3,
+                                                    max_simulation_time=10,
+                                                    check_object_interval=1,
+                                                    substeps_per_frame = 20,
+                                                    solver_iters=25)
 
-    # Sample objects on the given surface
-    placed_objects = bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_bop_objs + sampled_distractor_bop_objs,
-    #placed_objects = bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_bop_objs,
-                                                          surface=room_planes[0],
-                                                          sample_pose_func=sample_initial_pose,
-                                                          min_distance=0.01,
-                                                          max_distance=0.2)
-
+    # BVH tree used for camera obstacle checks
     bop_bvh_tree = bproc.object.create_bvh_tree_multi_objects(sampled_target_bop_objs + sampled_distractor_bop_objs)
-    #bop_bvh_tree = bproc.object.create_bvh_tree_multi_objects(sampled_target_bop_objs)
-
-    print('BVH_TREE: ', bop_bvh_tree)
 
     cam_poses = 0
-    #while cam_poses < 25:
     while cam_poses < 25:
         # Sample location
         location = bproc.sampler.shell(center = [0, 0, 0],
-                                radius_min = 0.35,
-                                radius_max = 1.5,
+                                radius_min = 0.65,
+                                radius_max = 0.94,
                                 elevation_min = 5,
                                 elevation_max = 89)
         # Determine point of interest in scene as the object closest to the mean of a subset of objects
-        poi = bproc.object.compute_poi(np.random.choice(sampled_target_bop_objs, size=10, replace=False))
-
+        poi = bproc.object.compute_poi(np.random.choice(sampled_target_bop_objs, size=15, replace=False))
         # Compute rotation based on vector going from location towards poi
-        rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location, inplane_rot=np.random.uniform(-0.7854, 0.7854))
+        rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location, inplane_rot=np.random.uniform(-3.14159, 3.14159))
         # Add homog cam pose based on location an rotation
         cam2world_matrix = bproc.math.build_transformation_mat(location, rotation_matrix)
         
@@ -197,20 +182,20 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless_3r_1o',
+                           dataset = 'tless_7r',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10,
-                           append_to_existing_output=True)
-
+                           ignore_dist_thres = 10)
+    
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
-    #for obj in (sampled_target_bop_objs):      
+        obj.disable_rigidbody()
         obj.hide(True)
 
+
     scene_cnt = scene_cnt + 1
-    if scene_cnt == 4:
+    if scene_cnt == 7:
         scene_cnt = 0
 
     #bproc.renderer.free_blender_memory()

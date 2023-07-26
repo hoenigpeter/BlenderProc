@@ -3,7 +3,7 @@ import argparse
 import os
 import numpy as np
 import copy 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_3r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_tless_random_5r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -21,7 +21,7 @@ cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
 
 cc_textures_list = []
 for i in range(30):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_3r/" + str(i))
+    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_5r/" + str(i))
     print("Folder: ", i)
     print("Textures: ", len(temp))
     print()
@@ -182,7 +182,7 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless_3r',
+                           dataset = 'tless_5r',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
@@ -195,7 +195,7 @@ for i in range(args.num_scenes):
 
 
     scene_cnt = scene_cnt + 1
-    if scene_cnt == 3:
+    if scene_cnt == 5:
         scene_cnt = 0
 
     #bproc.renderer.free_blender_memory()

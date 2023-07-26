@@ -9,10 +9,10 @@ import random
 
 # set the source and destination directories
 source_dir = '/home/hoenig/BlenderProc/resources/cc_textures'
-dest_dir = '/home/hoenig/BlenderProc/examples/datasets/bop_challenge/cc_textures_3r'
+dest_dir = '/home/hoenig/BlenderProc/examples/datasets/bop_challenge/cc_textures_5r'
 
 # set the number of folders to copy
-num_folders_to_copy = 3
+num_folders_to_copy = 5
 
 # set the number of times to repeat the process
 num_repeats = 30

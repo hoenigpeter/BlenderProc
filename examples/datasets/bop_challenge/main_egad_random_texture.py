@@ -2,8 +2,8 @@ import blenderproc as bproc
 import argparse
 import os
 import numpy as np
-import copy 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_3r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+
+#python rerun.py run examples/datasets/bop_challenge/main_egad_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -12,30 +12,10 @@ parser.add_argument('output_dir', help="Path to where the final files will be sa
 parser.add_argument('--num_scenes', type=int, default=2000, help="How many scenes with 25 images each to generate")
 args = parser.parse_args()
 
-print('NUM_SCENES: ', args.num_scenes)
-
 bproc.init()
 
-# load cc_textures
-cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
-
-cc_textures_list = []
-for i in range(30):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_3r/" + str(i))
-    print("Folder: ", i)
-    print("Textures: ", len(temp))
-    print()
-    cc_textures_list.append(temp)
-
-print("cc_textures:")
-print(len(cc_textures))
-print("cc_textures_random")
-print(len(cc_textures_list))
-print(cc_textures[0].blender_obj.name)
-
-
 # load bop objects into the scene
-target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
+target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'egad'), model_type = 'cad', mm2m = True)
 
 # load distractor bop objects
 itodd_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'itodd'), mm2m = True)
@@ -43,7 +23,7 @@ ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
 # load BOP datset intrinsics
-bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
+bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'egad'))
 
 # set shading and hide objects
 for obj in (target_bop_objs + itodd_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
@@ -56,7 +36,6 @@ room_planes = [bproc.object.create_primitive('PLANE', scale=[2, 2, 1]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[0, 2, 2], rotation=[1.570796, 0, 0]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[2, 0, 2], rotation=[0, -1.570796, 0]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[-2, 0, 2], rotation=[0, 1.570796, 0])]
-
 for plane in room_planes:
     plane.enable_rigidbody(False, collision_shape='BOX', mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
 
@@ -69,6 +48,9 @@ light_plane_material = bproc.material.create('light_material')
 light_point = bproc.types.Light()
 light_point.set_energy(100)
 
+# load cc_textures
+cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
+
 # Define a function that samples 6-DoF poses
 def sample_pose_func(obj: bproc.types.MeshObject):
     min = np.random.uniform([-0.3, -0.3, 0.0], [-0.2, -0.2, 0.0])
@@ -80,52 +62,38 @@ def sample_pose_func(obj: bproc.types.MeshObject):
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
 bproc.renderer.set_max_amount_of_samples(50)
 
-original_textures = []
-for idx, obj in enumerate(target_bop_objs):
-    print("materials: ", obj.get_materials()[0])
-    original_textures.append(obj.get_materials()[0])
-
-scene_cnt = 0
 for i in range(args.num_scenes):
 
     # Sample bop objects for a scene
-    #sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=15, replace=False))
-    sampled_target_bop_objs = list(np.copy(target_bop_objs))
+    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=20, replace=False))
     sampled_distractor_bop_objs = list(np.random.choice(itodd_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(ycbv_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
 
     # Randomize materials and set physics
-    #for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs): 
-    for idx, obj in enumerate(sampled_target_bop_objs):
-        print("obj texture: ", obj.get_materials()[0].blender_obj.name)
-        print("idx: ", idx, " scene_cnt: ", scene_cnt)
-        print("cc_textures_list: ", len(cc_textures_list[idx]))
-    
-        #if obj.get_cp("bop_dataset_name") == 'lm':
-        cc_texture_from_list = cc_textures_list[idx][scene_cnt - 1]
-        obj.replace_materials(cc_texture_from_list)
-        mat = obj.get_materials()[0]
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))                    
-
+    for obj in (sampled_target_bop_objs):        
+        random_cc_texture = np.random.choice(cc_textures)
+        obj.replace_materials(random_cc_texture)
         if not obj.has_uv_mapping():
             obj.add_uv_mapping("smart")
-
+        mat = obj.get_materials()[0]
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
         mat.set_principled_shader_value("Alpha", 1.0)
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
 
-    for idx, obj in enumerate(sampled_distractor_bop_objs):       
+    for obj in (sampled_distractor_bop_objs):        
         mat = obj.get_materials()[0]
-        if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
+        if obj.get_cp("bop_dataset_name") in ['itodd', 'egad']:
             grey_col = np.random.uniform(0.1, 0.9)   
             mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 0.5))
+        if obj.get_cp("bop_dataset_name") == 'itodd':  
+            mat.set_principled_shader_value("Metallic", np.random.uniform(0.5, 1.0))
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
-    
+
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
                                     emission_color=np.random.uniform([0.5, 0.5, 0.5, 1.0], [1.0, 1.0, 1.0, 1.0]))  
@@ -141,6 +109,7 @@ for i in range(args.num_scenes):
         plane.replace_materials(random_cc_texture)
 
 
+    # Sample object poses and check collisions 
     bproc.object.sample_poses(objects_to_sample = sampled_target_bop_objs + sampled_distractor_bop_objs,
                             sample_pose_func = sample_pose_func, 
                             max_tries = 1000)
@@ -182,20 +151,14 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless_3r',
+                           dataset = 'egad_random_texture',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()
         obj.hide(True)
-
-
-    scene_cnt = scene_cnt + 1
-    if scene_cnt == 3:
-        scene_cnt = 0
-
-    #bproc.renderer.free_blender_memory()
