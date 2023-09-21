@@ -89,6 +89,81 @@ def write_bop(output_dir: str, target_objects: Optional[List[MeshObject]] = None
                                    m2mm=m2mm, ignore_dist_thres=ignore_dist_thres, save_world2cam=save_world2cam,
                                    depth_scale=depth_scale, jpg_quality=jpg_quality)
 
+def write_gbuffer(output_dir: str, target_objects: Optional[List[MeshObject]] = None,
+              depths: Optional[List[np.ndarray]] = None, colors: Optional[List[np.ndarray]] = None, 
+              diffuse: Optional[List[np.ndarray]] = None, normals: Optional[List[np.ndarray]] = None, specular: Optional[List[np.ndarray]] = None,
+              color_file_format: str = "PNG", dataset: str = "", append_to_existing_output: bool = True,
+              depth_scale: float = 1.0, jpg_quality: int = 95, save_world2cam: bool = True,
+              ignore_dist_thres: float = 100., m2mm: bool = True, frames_per_chunk: int = 1000):
+    """Write the BOP data
+
+    :param output_dir: Path to the output directory.
+    :param target_objects: Objects for which to save ground truth poses in BOP format. Default: Save all objects or
+                           from specified dataset
+    :param depths: List of depth images in m to save
+    :param colors: List of color images to save
+    :param color_file_format: File type to save color images. Available: "PNG", "JPEG"
+    :param jpg_quality: If color_file_format is "JPEG", save with the given quality.
+    :param dataset: Only save annotations for objects of the specified bop dataset. Saves all object poses if undefined.
+    :param append_to_existing_output: If true, the new frames will be appended to the existing ones.
+    :param depth_scale: Multiply the uint16 output depth image with this factor to get depth in mm. Used to trade-off
+                        between depth accuracy and maximum depth value. Default corresponds to 65.54m maximum depth
+                        and 1mm accuracy.
+    :param save_world2cam: If true, camera to world transformations "cam_R_w2c", "cam_t_w2c" are saved
+                           in scene_camera.json
+    :param ignore_dist_thres: Distance between camera and object after which object is ignored. Mostly due to
+                              failed physics.
+    :param m2mm: Original bop annotations and models are in mm. If true, we convert the gt annotations to mm here. This
+                 is needed if BopLoader option mm2m is used.
+    :param frames_per_chunk: Number of frames saved in each chunk (called scene in BOP)
+    """
+    if depths is None:
+        depths = []
+    if colors is None:
+        colors = []
+    if diffuse is None:
+        diffuse = []
+    if normals is None:
+        normals = []
+    if specular is None:
+        specular = []
+
+    # Output paths.
+    dataset_dir = os.path.join(output_dir, dataset)
+    chunks_dir = os.path.join(dataset_dir, 'train_pbr')
+    camera_path = os.path.join(dataset_dir, 'camera.json')
+
+    # Create the output directory structure.
+    if not os.path.exists(dataset_dir):
+        os.makedirs(dataset_dir)
+        os.makedirs(chunks_dir)
+    elif not append_to_existing_output:
+        raise FileExistsError(f"The output folder already exists: {dataset_dir}")
+
+    # Select target objects or objects from the specified dataset or all objects
+    if target_objects is not None:
+        dataset_objects = target_objects
+    elif dataset:
+        dataset_objects = []
+        for obj in get_all_mesh_objects():
+            if "bop_dataset_name" in obj.blender_obj and not obj.blender_obj.hide_render:
+                if obj.blender_obj["bop_dataset_name"] == dataset:
+                    dataset_objects.append(obj)
+    else:
+        dataset_objects = get_all_mesh_objects()
+
+    # Check if there is any object from the specified dataset.
+    if not dataset_objects:
+        raise RuntimeError(f"The scene does not contain any object from the specified dataset: {dataset}. "
+                           f"Either remove the dataset parameter or assign custom property 'bop_dataset_name'"
+                           f" to selected objects")
+
+    # Save the data.
+    _BopWriterUtility.write_camera(camera_path, depth_scale=depth_scale)
+    _BopWriterUtility.write_gbuffer_frames(chunks_dir, dataset_objects=dataset_objects, depths=depths, colors=colors, diffuse=diffuse, normals=normals, specular=specular,
+                                   color_file_format=color_file_format, frames_per_chunk=frames_per_chunk,
+                                   m2mm=m2mm, ignore_dist_thres=ignore_dist_thres, save_world2cam=save_world2cam,
+                                   depth_scale=depth_scale, jpg_quality=jpg_quality)
 
 class _BopWriterUtility:
     """ Saves the synthesized dataset in the BOP format. The dataset is split
@@ -390,6 +465,207 @@ class _BopWriterUtility:
                 # Copy the resulting RGB image.
                 rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type=color_ext)
                 shutil.copyfile(rgb_output['path'] % frame_id, rgb_fpath)
+
+            if depths:
+                depth = depths[frame_id]
+            else:
+                # Load the resulting dist image.
+                dist_output = Utility.find_registered_output_by_key("distance")
+                if dist_output is None:
+                    raise Exception("Distance image has not been rendered.")
+                distance = _WriterUtility.load_output_file(resolve_path(dist_output['path'] % frame_id), remove=False)
+                depth = dist2depth(distance)
+
+            # Scale the depth to retain a higher precision (the depth is saved
+            # as a 16-bit PNG image with range 0-65535).
+            depth_mm = 1000.0 * depth  # [m] -> [mm]
+            depth_mm_scaled = depth_mm / float(depth_scale)
+
+            # Save the scaled depth image.
+            depth_fpath = depth_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id)
+            _BopWriterUtility.save_depth(depth_fpath, depth_mm_scaled)
+
+            # Save the chunk info if we are at the end of a chunk or at the last new frame.
+            if ((curr_frame_id + 1) % frames_per_chunk == 0) or \
+                    (frame_id == num_new_frames - 1):
+
+                # Save GT annotations.
+                _BopWriterUtility.save_json(chunk_gt_tpath.format(chunk_id=curr_chunk_id), chunk_gt)
+
+                # Save camera info.
+                _BopWriterUtility.save_json(chunk_camera_tpath.format(chunk_id=curr_chunk_id), chunk_camera)
+
+                # Update ID's.
+                curr_chunk_id += 1
+                curr_frame_id = 0
+            else:
+                curr_frame_id += 1
+
+    @staticmethod
+    def write_gbuffer_frames(chunks_dir: str, dataset_objects: list, depths: Optional[List[np.ndarray]] = None,
+                     colors: Optional[List[np.ndarray]] = None, diffuse: Optional[List[np.ndarray]] = None,
+                     normals: Optional[List[np.ndarray]] = None, specular: Optional[List[np.ndarray]] = None, color_file_format: str = "PNG",
+                     depth_scale: float = 1.0, frames_per_chunk: int = 1000, m2mm: bool = True,
+                     ignore_dist_thres: float = 100., save_world2cam: bool = True, jpg_quality: int = 95):
+        """Write each frame's ground truth into chunk directory in BOP format
+
+        :param chunks_dir: Path to the output directory of the current chunk.
+        :param dataset_objects: Save annotations for these objects.
+        :param depths: List of depth images in m to save
+        :param colors: List of color images to save
+        :param color_file_format: File type to save color images. Available: "PNG", "JPEG"
+        :param jpg_quality: If color_file_format is "JPEG", save with the given quality.
+        :param depth_scale: Multiply the uint16 output depth image with this factor to get depth in mm. Used to
+                            trade-off between depth accuracy and maximum depth value. Default corresponds to
+                            65.54m maximum depth and 1mm accuracy.
+        :param ignore_dist_thres: Distance between camera and object after which object is ignored.
+                                  Mostly due to failed physics.
+        :param m2mm: Original bop annotations and models are in mm. If true, we convert the gt annotations
+                     to mm here. This is needed if BopLoader option mm2m is used.
+        :param frames_per_chunk: Number of frames saved in each chunk (called scene in BOP)
+        """
+        if depths is None:
+            depths = []
+        if colors is None:
+            colors = []
+        if normals is None:
+            depths = []
+        if diffuse is None:
+            colors = []
+        if specular is None:
+            specular = []
+
+        # Format of the depth images.
+        depth_ext = '.png'
+
+        rgb_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'rgb', '{im_id:06d}' + '{im_type}')
+        depth_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'depth', '{im_id:06d}' + depth_ext)
+        normals_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'normals', '{im_id:06d}' + '{im_type}')
+        diffuse_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'diffuse', '{im_id:06d}' + '{im_type}')
+        specular_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'specular', '{im_id:06d}' + '{im_type}')
+
+        chunk_camera_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'scene_camera.json')
+        chunk_gt_tpath = os.path.join(chunks_dir, '{chunk_id:06d}', 'scene_gt.json')
+
+        # Paths to the already existing chunk folders (such folders may exist
+        # when appending to an existing dataset).
+        chunk_dirs = sorted(glob.glob(os.path.join(chunks_dir, '*')))
+        chunk_dirs = [d for d in chunk_dirs if os.path.isdir(d)]
+
+        # Get ID's of the last already existing chunk and frame.
+        curr_chunk_id = 0
+        curr_frame_id = 0
+        if len(chunk_dirs):
+            last_chunk_dir = sorted(chunk_dirs)[-1]
+            last_chunk_gt_fpath = os.path.join(last_chunk_dir, 'scene_gt.json')
+            chunk_gt = _BopWriterUtility.load_json(last_chunk_gt_fpath, keys_to_int=True)
+
+            # Last chunk and frame ID's.
+            last_chunk_id = int(os.path.basename(last_chunk_dir))
+            last_frame_id = int(sorted(chunk_gt.keys())[-1])
+
+            # Current chunk and frame ID's.
+            curr_chunk_id = last_chunk_id
+            curr_frame_id = last_frame_id + 1
+            if curr_frame_id % frames_per_chunk == 0:
+                curr_chunk_id += 1
+                curr_frame_id = 0
+
+        # Initialize structures for the GT annotations and camera info.
+        chunk_gt = {}
+        chunk_camera = {}
+        if curr_frame_id != 0:
+            # Load GT and camera info of the chunk we are appending to.
+            chunk_gt = _BopWriterUtility.load_json(
+                chunk_gt_tpath.format(chunk_id=curr_chunk_id), keys_to_int=True)
+            chunk_camera = _BopWriterUtility.load_json(
+                chunk_camera_tpath.format(chunk_id=curr_chunk_id), keys_to_int=True)
+
+        # Go through all frames.
+        num_new_frames = bpy.context.scene.frame_end - bpy.context.scene.frame_start
+
+        if len(depths) != len(colors) != num_new_frames:
+            raise Exception("The amount of images stored in the depths/colors does not correspond to the amount"
+                            "of images specified by frame_start to frame_end.")
+
+        for frame_id in range(bpy.context.scene.frame_start, bpy.context.scene.frame_end):
+            # Activate frame.
+            bpy.context.scene.frame_set(frame_id)
+
+            # Reset data structures and prepare folders for a new chunk.
+            if curr_frame_id == 0:
+                chunk_gt = {}
+                chunk_camera = {}
+                os.makedirs(os.path.dirname(
+                    rgb_tpath.format(chunk_id=curr_chunk_id, im_id=0, im_type='PNG')))
+                os.makedirs(os.path.dirname(
+                    diffuse_tpath.format(chunk_id=curr_chunk_id, im_id=0, im_type='PNG')))
+                os.makedirs(os.path.dirname(
+                    normals_tpath.format(chunk_id=curr_chunk_id, im_id=0, im_type='PNG')))
+                os.makedirs(os.path.dirname(
+                   specular_tpath.format(chunk_id=curr_chunk_id, im_id=0, im_type='PNG')))
+                os.makedirs(os.path.dirname(
+                    depth_tpath.format(chunk_id=curr_chunk_id, im_id=0)))
+
+            # Get GT annotations and camera info for the current frame.
+
+            # Output translation gt in m or mm
+            unit_scaling = 1000. if m2mm else 1.
+
+            chunk_gt[curr_frame_id] = _BopWriterUtility.get_frame_gt(dataset_objects, unit_scaling, ignore_dist_thres)
+            chunk_camera[curr_frame_id] = _BopWriterUtility.get_frame_camera(save_world2cam, depth_scale, unit_scaling)
+
+            if colors:
+                color_rgb = colors[frame_id]
+                color_bgr = color_rgb.copy()
+                color_bgr[..., :3] = color_bgr[..., :3][..., ::-1]
+                if color_file_format == 'PNG':
+                    rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.png')
+                    cv2.imwrite(rgb_fpath, color_bgr)
+                elif color_file_format == 'JPEG':
+                    rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.jpg')
+                    cv2.imwrite(rgb_fpath, color_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
+            else:
+                rgb_output = Utility.find_registered_output_by_key("colors")
+                if rgb_output is None:
+                    raise Exception("RGB image has not been rendered.")
+                color_ext = '.png' if rgb_output['path'].endswith('png') else '.jpg'
+                # Copy the resulting RGB image.
+                rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type=color_ext)
+                shutil.copyfile(rgb_output['path'] % frame_id, rgb_fpath)
+
+            if diffuse:
+                diffuse_rgb = diffuse[frame_id]
+                diffuse_bgr = diffuse_rgb.copy()
+                diffuse_bgr[..., :3] = diffuse_bgr[..., :3][..., ::-1]
+                if color_file_format == 'PNG':
+                    diffuse_fpath = diffuse_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.png')
+                    cv2.imwrite(diffuse_fpath, diffuse_bgr)
+                # elif color_file_format == 'JPEG':
+                #     rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.jpg')
+                #     cv2.imwrite(rgb_fpath, color_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
+
+            if normals:
+                normals_rgb = normals[frame_id]
+                normals_bgr = normals_rgb.copy()
+                normals_bgr[..., :3] = normals_bgr[..., :3][..., ::-1]
+                if color_file_format == 'PNG':
+                    normals_fpath = normals_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.png')
+                    cv2.imwrite(normals_fpath, normals_bgr)
+                # elif color_file_format == 'JPEG':
+                #     rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.jpg')
+                #     cv2.imwrite(rgb_fpath, color_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
+
+            if specular:
+                specular_rgb = specular[frame_id]
+                specular_bgr = specular_rgb.copy()
+                specular_bgr[..., :3] = specular_bgr[..., :3][..., ::-1]
+                if color_file_format == 'PNG':
+                    specular_fpath = specular_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.png')
+                    cv2.imwrite(specular_fpath, specular_bgr)
+                # elif color_file_format == 'JPEG':
+                #     rgb_fpath = rgb_tpath.format(chunk_id=curr_chunk_id, im_id=curr_frame_id, im_type='.jpg')
+                #     cv2.imwrite(rgb_fpath, color_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), jpg_quality])
 
             if depths:
                 depth = depths[frame_id]
