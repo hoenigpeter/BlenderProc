@@ -3,7 +3,7 @@ import argparse
 import os
 import numpy as np
 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_mp6d_random.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")

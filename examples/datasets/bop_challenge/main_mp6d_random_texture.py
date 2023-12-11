@@ -3,7 +3,7 @@ import argparse
 import os
 import numpy as np
 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_mp6d_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -23,7 +23,7 @@ ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
 # load BOP datset intrinsics
-bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
+bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'mp6d'))
 
 # set shading and hide objects
 for obj in (target_bop_objs + tless_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
