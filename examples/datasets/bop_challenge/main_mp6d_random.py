@@ -147,7 +147,8 @@ for i in range(args.num_scenes):
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()
