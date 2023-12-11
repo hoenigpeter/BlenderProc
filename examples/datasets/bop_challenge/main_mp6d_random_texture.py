@@ -15,10 +15,10 @@ args = parser.parse_args()
 bproc.init()
 
 # load bop objects into the scene
-target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
+target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'mp6d'), model_type = 'cad', mm2m = True)
 
 # load distractor bop objects
-itodd_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'itodd'), mm2m = True)
+tless_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), mm2m = True)
 ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'ycbv'), mm2m = True)
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
@@ -26,7 +26,7 @@ hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(ar
 bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
 
 # set shading and hide objects
-for obj in (target_bop_objs + itodd_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
+for obj in (target_bop_objs + tless_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
     obj.set_shading_mode('auto')
     obj.hide(True)
     
@@ -66,12 +66,24 @@ for i in range(args.num_scenes):
 
     # Sample bop objects for a scene
     sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=20, replace=False))
-    sampled_distractor_bop_objs = list(np.random.choice(itodd_dist_bop_objs, size=2, replace=False))
+    sampled_distractor_bop_objs = list(np.random.choice(tless_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(ycbv_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
 
     # Randomize materials and set physics
-    for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):        
+    for obj in (sampled_target_bop_objs):        
+        random_cc_texture = np.random.choice(cc_textures)
+        obj.replace_materials(random_cc_texture)
+        if not obj.has_uv_mapping():
+            obj.add_uv_mapping("smart")
+        mat = obj.get_materials()[0]
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Alpha", 1.0)
+        obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
+        obj.hide(False)
+
+    for obj in (sampled_distractor_bop_objs):        
         mat = obj.get_materials()[0]
         if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
             grey_col = np.random.uniform(0.1, 0.9)   
@@ -79,11 +91,10 @@ for i in range(args.num_scenes):
         mat.set_principled_shader_value("Roughness", np.random.uniform(0, 0.5))
         if obj.get_cp("bop_dataset_name") == 'itodd':  
             mat.set_principled_shader_value("Metallic", np.random.uniform(0.5, 1.0))
-        if obj.get_cp("bop_dataset_name") == 'tless':
-            mat.set_principled_shader_value("Specular", np.random.uniform(0.3, 1.0))
-            mat.set_principled_shader_value("Metallic", np.random.uniform(0, 0.5))
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
+
+    obj.hide(True)
     
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -142,12 +153,13 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless',
+                           dataset = 'mp6d_random_texture',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()

@@ -3,7 +3,7 @@ import argparse
 import os
 import numpy as np
 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_adapt_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -15,7 +15,7 @@ args = parser.parse_args()
 bproc.init()
 
 # load bop objects into the scene
-target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
+target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'adapt'), model_type = 'cad', mm2m = True)
 
 # load distractor bop objects
 itodd_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'itodd'), mm2m = True)
@@ -23,7 +23,7 @@ ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
 # load BOP datset intrinsics
-bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
+bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'adapt'))
 
 # set shading and hide objects
 for obj in (target_bop_objs + itodd_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
@@ -65,25 +65,36 @@ bproc.renderer.set_max_amount_of_samples(50)
 for i in range(args.num_scenes):
 
     # Sample bop objects for a scene
-    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=20, replace=False))
+    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=12, replace=False))
     sampled_distractor_bop_objs = list(np.random.choice(itodd_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(ycbv_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
 
     # Randomize materials and set physics
-    for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):        
+    for obj in (sampled_target_bop_objs):        
+        random_cc_texture = np.random.choice(cc_textures)
+        obj.replace_materials(random_cc_texture)
+        if not obj.has_uv_mapping():
+            obj.add_uv_mapping("smart")
         mat = obj.get_materials()[0]
-        if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Alpha", 1.0)
+        obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
+        obj.hide(False)
+
+    for obj in (sampled_distractor_bop_objs):        
+        mat = obj.get_materials()[0]
+        if obj.get_cp("bop_dataset_name") in ['itodd', 'adapt']:
             grey_col = np.random.uniform(0.1, 0.9)   
             mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
         mat.set_principled_shader_value("Roughness", np.random.uniform(0, 0.5))
         if obj.get_cp("bop_dataset_name") == 'itodd':  
             mat.set_principled_shader_value("Metallic", np.random.uniform(0.5, 1.0))
-        if obj.get_cp("bop_dataset_name") == 'tless':
-            mat.set_principled_shader_value("Specular", np.random.uniform(0.3, 1.0))
-            mat.set_principled_shader_value("Metallic", np.random.uniform(0, 0.5))
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
+
+    obj.hide(True)
     
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -124,7 +135,7 @@ for i in range(args.num_scenes):
                                 elevation_min = 5,
                                 elevation_max = 89)
         # Determine point of interest in scene as the object closest to the mean of a subset of objects
-        poi = bproc.object.compute_poi(np.random.choice(sampled_target_bop_objs, size=15, replace=False))
+        poi = bproc.object.compute_poi(np.random.choice(sampled_target_bop_objs, size=12, replace=False))
         # Compute rotation based on vector going from location towards poi
         rotation_matrix = bproc.camera.rotation_from_forward_vec(poi - location, inplane_rot=np.random.uniform(-3.14159, 3.14159))
         # Add homog cam pose based on location an rotation
@@ -142,12 +153,13 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless',
+                           dataset = 'adapt_random_texture',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()

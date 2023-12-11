@@ -72,18 +72,16 @@ for i in range(args.num_scenes):
 
     # Randomize materials and set physics
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):        
+        if not obj.has_uv_mapping():
+            obj.add_uv_mapping("smart")
         mat = obj.get_materials()[0]
-        if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
-            grey_col = np.random.uniform(0.1, 0.9)   
-            mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 0.5))
-        if obj.get_cp("bop_dataset_name") == 'itodd':  
-            mat.set_principled_shader_value("Metallic", np.random.uniform(0.5, 1.0))
-        if obj.get_cp("bop_dataset_name") == 'tless':
-            mat.set_principled_shader_value("Specular", np.random.uniform(0.3, 1.0))
-            mat.set_principled_shader_value("Metallic", np.random.uniform(0, 0.5))
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Alpha", 0)
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
+
+    obj.hide(True)
     
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -142,12 +140,13 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless',
+                           dataset = 'tless_random_texture',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()
