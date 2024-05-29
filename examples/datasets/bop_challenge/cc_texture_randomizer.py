@@ -5,8 +5,6 @@ import numpy as np
 import shutil
 import random
 
-#python rerun.py run examples/datasets/bop_challenge/main_lm_upright_3r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
-
 # set the source and destination directories
 source_dir = '/home/hoenig/BlenderProc/resources/cc_textures'
 dest_dir = '/home/hoenig/BlenderProc/examples/datasets/bop_challenge/cc_textures_5r'

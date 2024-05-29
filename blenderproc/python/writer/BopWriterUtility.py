@@ -393,11 +393,12 @@ class _BopWriterUtility:
         # Get ID's of the last already existing chunk and frame.
         curr_chunk_id = 0
         curr_frame_id = 0
+        print(chunk_dirs)
         if len(chunk_dirs):
             last_chunk_dir = sorted(chunk_dirs)[-1]
             last_chunk_gt_fpath = os.path.join(last_chunk_dir, 'scene_gt.json')
             chunk_gt = _BopWriterUtility.load_json(last_chunk_gt_fpath, keys_to_int=True)
-
+            print(chunk_gt)
             # Last chunk and frame ID's.
             last_chunk_id = int(os.path.basename(last_chunk_dir))
             last_frame_id = int(sorted(chunk_gt.keys())[-1])

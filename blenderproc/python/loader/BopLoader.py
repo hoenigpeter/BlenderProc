@@ -50,7 +50,7 @@ def load_bop_objs(bop_dataset_path: str, model_type: str = "", obj_ids: Optional
         temp_dir = Utility.get_temporary_directory()
 
     scale = 0.001 if mm2m else 1
-    has_external_texture = bop_dataset_name in ["ycbv", "ruapc", "hope"]
+    has_external_texture = bop_dataset_name in ["ycb_ichores", "ycbv", "ruapc", "hope"]
     if obj_ids is None:
         obj_ids = []
     allow_duplication = obj_ids or sample_objects
@@ -213,6 +213,35 @@ def load_bop_intrinsics(bop_dataset_path: str, split: str = "test", cam_type: st
 
     return cam_p['K'], split_p['im_size'][0], split_p['im_size'][1]
 
+def load_bop_intrinsics_custom(params) -> Tuple[np.ndarray, int, int]:
+    """
+    Load and set the camera matrix and image resolution of a specified BOP dataset
+
+    :param bop_dataset_path: Full path to a specific bop dataset e.g. /home/user/bop/tless.
+    :param split: Optionally, train, test or val split depending on BOP dataset, defaults to "test"
+    :param cam_type: Camera type. If not defined, dataset-specific default camera type is used.
+    :returns: camera matrix K, W, H
+    """
+
+    # set camera intrinsics
+
+    # Extract camera parameters
+    fx = params["fx"]
+    fy = params["fy"]
+    cx = params["cx"]
+    cy = params["cy"]
+
+    # Create the camera matrix
+    K = np.array([
+        [fx, 0, cx, 0],
+        [0, fy, cy, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
+    ])
+
+    CameraUtility.set_intrinsics_from_K_matrix(K, params['height'], params['width'])
+
+    return K, params['height'], params['width']
 
 class _BopLoader:
 

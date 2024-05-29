@@ -10,8 +10,6 @@ import numpy as np
 import bpy
 import mathutils
 import h5py
-from PIL import Image
-import png
 
 from blenderproc.python.postprocessing.PostProcessingUtility import trim_redundant_channels, \
     segmentation_mapping
@@ -23,96 +21,6 @@ from blenderproc.python.utility.MathUtility import change_coordinate_frame_of_po
     change_source_coordinate_frame_of_transformation_matrix, change_target_coordinate_frame_of_transformation_matrix
 from blenderproc.python.camera import CameraUtility
 
-def write_images(output_dir_path: str, scene_id: int, output_data_dict: Dict[str, List[Union[np.ndarray, list, dict]]]):
-    """
-    Saves the information provided inside of the output_data_dict into a .hdf5 container
-
-    :param output_dir_path: The folder path in which the .hdf5 containers will be generated
-    :param output_data_dict: The container, which keeps the different images, which should be saved to disc.
-                             Each key will be saved as its own key in the .hdf5 container.
-    """
-
-    amount_of_frames = 0
-    for data_block in output_data_dict.values():
-        if isinstance(data_block, list):
-            amount_of_frames = max([amount_of_frames, len(data_block)])
-
-    if amount_of_frames != bpy.context.scene.frame_end - bpy.context.scene.frame_start:
-        raise Exception("The amount of images stored in the output_data_dict does not correspond with the amount"
-                        "of images specified by frame_start to frame_end.")
-
-    for idx, frame in enumerate(range(bpy.context.scene.frame_start, bpy.context.scene.frame_end)):
-
-        adjusted_frame = frame - bpy.context.scene.frame_start
-        for key, data_block in output_data_dict.items():
-
-            if adjusted_frame < len(data_block):
-   
-                if isinstance(data_block[adjusted_frame], list):
-                    if not data_block[adjusted_frame]:
-                        continue
-                else:
-                    data_array = data_block[adjusted_frame]
-
-
-
-                #image_path = output_dir_path + "/" + key + f"/{scene_id}_{idx}.png"
-                image_path = f"{output_dir_path}/{key}/{scene_id:06d}_{idx:06d}.png"
-                
-                # Check the shape of the image
-                if len(data_array.shape) > 2:
-                    if data_array.dtype == np.float32:
-                        data_array = (data_array * 255).astype(np.uint8)
-
-                    if data_array.shape[2] == 3:
-                        img = Image.fromarray(data_array)
-
-                    elif data_array.shape[2] == 4:
-                        alpha_channel = data_array[:, :, 3]
-                        img = Image.fromarray(data_array[:, :, :3])
-
-                    img.save(image_path, format='PNG')
-
-                else:
-                    # Handle other cases or raise an error
-                    if key == 'depth':
-                        if data_array.dtype == np.float32:
-                            data_array[data_array > 10.0] = 10.0
-                            img = Image.fromarray(data_array, 'L')
-                            img.save(image_path, format='PNG')
-                    else:
-                        data_array = (data_array * 255).astype(np.uint8)
-                        img = Image.fromarray(data_array)
-                        img.save(image_path, format='PNG')
-
-                #_WriterUtility.write_to_png_file(png_path, key, data_block[adjusted_frame])
-            else:
-                raise Exception(f"There are more frames {adjusted_frame} then there are blocks of information "
-                                f" {len(data_block)} in the given list for key {key}.")
-
-        blender_proc_version = Utility.get_current_version()
-        # if blender_proc_version is not None:
-        #     _WriterUtility.write_to_hdf_file(file, "blender_proc_version", np.string_(blender_proc_version))
-
-def save_depth(path: str, im: np.ndarray):
-    """Saves a depth image (16-bit) to a PNG file.
-    From the BOP toolkit (https://github.com/thodan/bop_toolkit).
-
-    :param path: Path to the output depth image file.
-    :param im: ndarray with the depth image to save.
-    """
-    if not path.endswith(".png"):
-        raise ValueError('Only PNG format is currently supported.')
-
-    im = im * 1000
-    im[im > 65535] = 65535
-
-    im_uint16 = np.round(im).astype(np.uint16)
-
-    # PyPNG library can save 16-bit PNG and is faster than imageio.imwrite().
-    w_depth = png.Writer(im.shape[1], im.shape[0], greyscale=True, bitdepth=16)
-    with open(path, 'wb') as f:
-        w_depth.write(f, np.reshape(im_uint16, (-1, im.shape[1])))
 
 def write_hdf5(output_dir_path: str, output_data_dict: Dict[str, List[Union[np.ndarray, list, dict]]],
                append_to_existing_output: bool = False, stereo_separate_keys: bool = False):
@@ -455,32 +363,3 @@ class _WriterUtility:
             file.create_dataset(key, data=data, dtype=data.dtype)
         else:
             file.create_dataset(key, data=data, compression=compression)
-
-    def write_to_png_file(file_path, key: str, data: Union[np.ndarray, list, dict], compression: str = "gzip"):
-        """ Adds the given data as a new entry to the given hdf5 file.
-
-        :param file: The hdf5 file handle. Type: hdf5.File
-        :param key: The key at which the data should be stored in the hdf5 file.
-        :param data: The data to store.
-        """
-        if not isinstance(data, np.ndarray) and not isinstance(data, np.bytes_):
-            if isinstance(data, (list, dict)):
-                # If the data contains one or multiple dicts that contain e.q. object states
-                if isinstance(data, dict) or len(data) > 0 and isinstance(data[0], dict):
-                    # Serialize them into json (automatically convert numpy arrays to lists)
-                    data = np.string_(json.dumps(data, cls=NumpyEncoder))
-                data = np.array(data)
-                print(data.shape)
-            else:
-                raise Exception(
-                    f"This fct. expects the data for key {key} to be a np.ndarray, list or dict not a {type(data)}!")
-
-        if data.dtype.char == 'S':
-            # Save as text in PNG metadata
-            img = Image.new('RGB', (1, 1), color=(255, 255, 255))
-            img.info["data"] = data.tobytes()
-            img.save(file_path, format='PNG')
-        else:
-            # Save as image data
-            img = Image.fromarray(data)
-            img.save(file_path, format='PNG')
