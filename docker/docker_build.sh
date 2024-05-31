@@ -1,3 +1,3 @@
 #!/bin/bash
 
-docker build --rm -t bproc .
+docker build --rm -t blenderproc .
