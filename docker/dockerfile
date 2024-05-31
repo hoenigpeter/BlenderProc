@@ -1,0 +1,40 @@
+FROM pytorch/pytorch:2.2.2-cuda12.1-cudnn8-runtime
+RUN pip install --no-cache nvidia-tensorrt --index-url https://pypi.ngc.nvidia.com
+
+ENV DEBIAN_FRONTEND noninteractive
+
+RUN apt update \
+    && apt install --no-install-recommends -y gcc git zip curl htop libgl1 libglib2.0-0 libpython3-dev gnupg g++ libusb-1.0-0
+
+# Security updates
+# https://security.snyk.io/vuln/SNYK-UBUNTU1804-OPENSSL-3314796
+RUN apt upgrade --no-install-recommends -y openssl tar
+
+RUN apt-get update && apt-get install -y \
+	python3-opencv ca-certificates python3-dev git wget sudo ninja-build
+
+RUN ln -sv /usr/bin/python3 /usr/bin/python
+
+RUN wget https://bootstrap.pypa.io/get-pip.py && \
+	python3 get-pip.py && \
+	rm get-pip.py
+
+# Install pip packages
+RUN python3 -m pip install --upgrade pip wheel
+
+# install lsb-release and curl
+RUN apt-get update \
+ && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    lsb-release \
+    curl \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+RUN apt-get update && \
+    apt-get install -y libqt5gui5 && \
+    rm -rf /var/lib/apt/lists/*
+ENV QT_DEBUG_PLUGINS=1
+
+RUN mkdir blenderproc
+
+WORKDIR /blenderproc
