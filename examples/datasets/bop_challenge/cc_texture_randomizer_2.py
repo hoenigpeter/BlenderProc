@@ -14,6 +14,8 @@ parser.add_argument('--num_repeats', type=int, default=30, help='The number of t
 
 args = parser.parse_args()
 
+random.seed(42)
+
 # Load textures
 cc_textures = bproc.loader.load_ccmaterials(args.source_dir)
 
