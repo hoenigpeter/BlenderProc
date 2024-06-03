@@ -40,7 +40,7 @@ for _ in range(args.num_repeats):
         shutil.copytree(source_path, dest_path)
 
         # Remove the folder from the list of folder names to prevent it from being selected again
-        folder_names.remove(folder_name)
+        #folder_names.remove(folder_name)
 
     folder_counter += 1
 
