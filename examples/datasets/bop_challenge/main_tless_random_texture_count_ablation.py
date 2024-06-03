@@ -24,7 +24,7 @@ cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
 
 cc_textures_list = []
 for i in range(num_objects):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_" + str(num_textures) + "r/" + str(i))
+    temp = bproc.loader.load_ccmaterials("/media/ssd2/peter/blenderproc/texture_count_ablation/cc_textures_" + str(num_textures) + "r/" + str(i))
     print("Folder: ", i)
     print("Textures: ", len(temp))
     print()
