@@ -14,7 +14,7 @@ parser.add_argument('--num_textures', type=int, default=20, help="How many scene
 args = parser.parse_args()
 
 print('NUM_SCENES: ', args.num_scenes)
-args.num_textures = num_textures
+num_textures = args.num_textures
 num_objects = 30
 
 bproc.init()
