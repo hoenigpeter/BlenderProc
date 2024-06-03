@@ -10,10 +10,11 @@ parser.add_argument('bop_parent_path', help="Path to the bop datasets parent dir
 parser.add_argument('cc_textures_path', default="resources/cctextures", help="Path to downloaded cc textures")
 parser.add_argument('output_dir', help="Path to where the final files will be saved ")
 parser.add_argument('--num_scenes', type=int, default=2000, help="How many scenes with 25 images each to generate")
-parser.add_argument('--num_textures', type=int, default=20, help="How many scenes with 25 images each to generate")
+parser.add_argument('--num_textures', type=int, default=10, help="How many scenes with 25 images each to generate")
 args = parser.parse_args()
 
 print('NUM_SCENES: ', args.num_scenes)
+print("num textures: ", args.num_textures)
 num_textures = args.num_textures
 num_objects = 30
 
