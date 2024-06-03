@@ -3,16 +3,19 @@ import argparse
 import os
 import numpy as np
 import copy 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_7r.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture_count_ablation.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000 --num_textures 20
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
 parser.add_argument('cc_textures_path', default="resources/cctextures", help="Path to downloaded cc textures")
 parser.add_argument('output_dir', help="Path to where the final files will be saved ")
 parser.add_argument('--num_scenes', type=int, default=2000, help="How many scenes with 25 images each to generate")
+parser.add_argument('--num_textures', type=int, default=20, help="How many scenes with 25 images each to generate")
 args = parser.parse_args()
 
 print('NUM_SCENES: ', args.num_scenes)
+args.num_textures = num_textures
+num_objects = 30
 
 bproc.init()
 
@@ -20,8 +23,8 @@ bproc.init()
 cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
 
 cc_textures_list = []
-for i in range(30):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_7r/" + str(i))
+for i in range(num_objects):
+    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_" + num_textures + "r/" + str(i))
     print("Folder: ", i)
     print("Textures: ", len(temp))
     print()
@@ -79,11 +82,6 @@ def sample_pose_func(obj: bproc.types.MeshObject):
 # activate depth rendering without antialiasing and set amount of samples for color rendering
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
 bproc.renderer.set_max_amount_of_samples(50)
-
-original_textures = []
-for idx, obj in enumerate(target_bop_objs):
-    print("materials: ", obj.get_materials()[0])
-    original_textures.append(obj.get_materials()[0])
 
 scene_cnt = 0
 for i in range(args.num_scenes):
@@ -182,7 +180,7 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless_7r',
+                           dataset = "tless_" + num_textures + "r",
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
@@ -193,9 +191,6 @@ for i in range(args.num_scenes):
         obj.disable_rigidbody()
         obj.hide(True)
 
-
     scene_cnt = scene_cnt + 1
-    if scene_cnt == 7:
+    if scene_cnt == num_textures:
         scene_cnt = 0
-
-    #bproc.renderer.free_blender_memory()
