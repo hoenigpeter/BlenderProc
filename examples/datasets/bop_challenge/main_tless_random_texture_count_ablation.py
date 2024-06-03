@@ -24,7 +24,7 @@ cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
 
 cc_textures_list = []
 for i in range(num_objects):
-    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_" + num_textures + "r/" + str(i))
+    temp = bproc.loader.load_ccmaterials("examples/datasets/bop_challenge/cc_textures_" + str(num_textures) + "r/" + str(i))
     print("Folder: ", i)
     print("Textures: ", len(temp))
     print()
@@ -180,7 +180,7 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = "tless_" + num_textures + "r",
+                           dataset = "tless_" + str(num_textures) + "r",
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
