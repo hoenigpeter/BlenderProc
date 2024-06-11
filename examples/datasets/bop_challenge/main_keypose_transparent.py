@@ -3,7 +3,29 @@ import argparse
 import os
 import numpy as np
 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+#python rerun.py run examples/datasets/bop_challenge/main_keypose_transparent.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000
+
+class TransparentMaterials: #CHANGE
+    def __init__(self, blend_file_path="TransparentMaterials.blend"):
+        self.materials = {}
+
+        objs = bproc.loader.load_blend(blend_file_path)
+
+        for obj in objs:
+            material = obj.get_materials()[0]
+            name = obj.get_name()
+            if name in self.materials:
+                raise ValueError(f"Material with name {name} already exists.")
+            self.materials[name] = material
+        
+        print(f"Successfully loaded {len(self.materials)} materials")
+
+        bproc.object.delete_multiple(objs)
+        print(self.materials)
+
+    def get_random_material(self):
+        
+        return np.random.choice(list(self.materials.values()))
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
@@ -14,8 +36,10 @@ args = parser.parse_args()
 
 bproc.init()
 
+transparent_materials = TransparentMaterials() #CHANGE
+
 # load bop objects into the scene
-target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
+target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'keypose'), mm2m = True)
 
 # load distractor bop objects
 itodd_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'itodd'), mm2m = True)
@@ -23,7 +47,7 @@ ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
 # load BOP datset intrinsics
-bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
+bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'keypose'))
 
 # set shading and hide objects
 for obj in (target_bop_objs + itodd_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
@@ -62,26 +86,37 @@ def sample_pose_func(obj: bproc.types.MeshObject):
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
 bproc.renderer.set_max_amount_of_samples(50)
 
+bproc.renderer.set_light_bounces( #CHANGE
+    glossy_bounces=32, 
+    max_bounces=32, 
+    transmission_bounces=32, 
+    transparent_max_bounces=50, 
+    volume_bounces=32)  
+
 for i in range(args.num_scenes):
 
     # Sample bop objects for a scene
-    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=20, replace=False))
+    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=15, replace=False))
     sampled_distractor_bop_objs = list(np.random.choice(itodd_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(ycbv_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
 
     # Randomize materials and set physics
-    for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):        
-        if not obj.has_uv_mapping():
-            obj.add_uv_mapping("smart")
-        mat = obj.get_materials()[0]
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Alpha", 0)
+    for obj in (sampled_target_bop_objs): #CHANGE
+        obj.replace_materials(transparent_materials.get_random_material())   
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
 
-    obj.hide(True)
+    # Randomize materials and set physics
+    for obj in (sampled_distractor_bop_objs):        
+        mat = obj.get_materials()[0]
+        if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
+            grey_col = np.random.uniform(0.1, 0.9)   
+            mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
+        obj.hide(False)
     
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -140,7 +175,7 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = 'tless_random_texture',
+                           dataset = 'keypose_transparent',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 

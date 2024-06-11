@@ -373,7 +373,6 @@ class _BopLoader:
         """
 
         model_path = model_p['model_tpath'].format(**{'obj_id': obj_id})
-
         texture_file_path = ""  # only needed for ycbv objects
 
         # Gets the objects if it is already loaded

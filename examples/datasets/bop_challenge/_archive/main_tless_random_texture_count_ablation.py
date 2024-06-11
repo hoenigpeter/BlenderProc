@@ -8,7 +8,7 @@ import copy
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
-parser.add_argument('cc_textures_path', default="resources/cc_textures", help="Path to downloaded cc textures")
+parser.add_argument('cc_textures_path', default="resources/cctextures", help="Path to downloaded cc textures")
 parser.add_argument('output_dir', help="Path to where the final files will be saved ")
 parser.add_argument('--num_scenes', type=int, default=2000, help="How many scenes with 25 images each to generate")
 parser.add_argument('--num_textures', type=int, default=10, help="asdf")
@@ -17,11 +17,27 @@ args = parser.parse_args()
 print('NUM_SCENES: ', args.num_scenes)
 print("num textures: ", args.num_textures)
 num_textures = args.num_textures
+num_objects = 30
 
 bproc.init()
 
 # load cc_textures
-cc_textures = bproc.loader.load_ccmaterials(str(args.cc_textures_path) + "_" + str(num_textures) + "r")
+cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
+
+cc_textures_list = []
+for i in range(num_objects):
+    temp = bproc.loader.load_ccmaterials("/media/ssd2/peter/blenderproc/texture_count_ablation/cc_textures_" + str(num_textures) + "r/" + str(i))
+    print("Folder: ", i)
+    print("Textures: ", len(temp))
+    print()
+    cc_textures_list.append(temp)
+
+print("cc_textures:")
+print(len(cc_textures))
+print("cc_textures_random")
+print(len(cc_textures_list))
+print(cc_textures[0].blender_obj.name)
+
 
 # load bop objects into the scene
 target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
@@ -80,14 +96,22 @@ for i in range(args.num_scenes):
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
 
     # Randomize materials and set physics
-    for obj in (sampled_target_bop_objs):        
-        random_cc_texture = np.random.choice(cc_textures)
-        obj.replace_materials(random_cc_texture)
-        if not obj.has_uv_mapping():
-            obj.add_uv_mapping("smart")
+    #for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs): 
+    for idx, obj in enumerate(sampled_target_bop_objs):
+        print("obj texture: ", obj.get_materials()[0].blender_obj.name)
+        print("idx: ", idx, " scene_cnt: ", scene_cnt)
+        print("cc_textures_list: ", len(cc_textures_list[idx]))
+    
+        #if obj.get_cp("bop_dataset_name") == 'lm':
+        cc_texture_from_list = cc_textures_list[idx][scene_cnt - 1]
+        obj.replace_materials(cc_texture_from_list)
         mat = obj.get_materials()[0]
         mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))                    
+
+        if not obj.has_uv_mapping():
+            obj.add_uv_mapping("smart")
+
         mat.set_principled_shader_value("Alpha", 1.0)
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)

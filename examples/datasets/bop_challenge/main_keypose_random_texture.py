@@ -2,29 +2,20 @@ import blenderproc as bproc
 import argparse
 import os
 import numpy as np
-import copy 
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture_count_ablation.py ../datasets resources/cc_textures examples/datasets/bop_challenge/output --num_scenes=1000 --num_textures 20
-#python rerun.py run examples/datasets/bop_challenge/main_tless_random_texture_count_ablation.py ../datasets /media/ssd2/peter/blenderproc/resources/cc_textures /media/ssd2/peter/blenderproc/bop_data --num_textures=40 --num_scenes=1000
+
+#python rerun.py run examples/datasets/bop_challenge/main_keypose_random_texture.py ../datasets resources/cc_textures /hdd/datasets_bop/keypose --num_scenes=1000
 
 parser = argparse.ArgumentParser()
 parser.add_argument('bop_parent_path', help="Path to the bop datasets parent directory")
-parser.add_argument('cc_textures_path', default="resources/cc_textures", help="Path to downloaded cc textures")
+parser.add_argument('cc_textures_path', default="resources/cctextures", help="Path to downloaded cc textures")
 parser.add_argument('output_dir', help="Path to where the final files will be saved ")
 parser.add_argument('--num_scenes', type=int, default=2000, help="How many scenes with 25 images each to generate")
-parser.add_argument('--num_textures', type=int, default=10, help="asdf")
 args = parser.parse_args()
-
-print('NUM_SCENES: ', args.num_scenes)
-print("num textures: ", args.num_textures)
-num_textures = args.num_textures
 
 bproc.init()
 
-# load cc_textures
-cc_textures = bproc.loader.load_ccmaterials(str(args.cc_textures_path) + "_" + str(num_textures) + "r")
-
 # load bop objects into the scene
-target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
+target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'keypose'), mm2m = True)
 
 # load distractor bop objects
 itodd_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'itodd'), mm2m = True)
@@ -32,7 +23,7 @@ ycbv_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(
 hb_dist_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'hb'), mm2m = True)
 
 # load BOP datset intrinsics
-bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'))
+bproc.loader.load_bop_intrinsics(bop_dataset_path = os.path.join(args.bop_parent_path, 'keypose'))
 
 # set shading and hide objects
 for obj in (target_bop_objs + itodd_dist_bop_objs + ycbv_dist_bop_objs + hb_dist_bop_objs):
@@ -45,7 +36,6 @@ room_planes = [bproc.object.create_primitive('PLANE', scale=[2, 2, 1]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[0, 2, 2], rotation=[1.570796, 0, 0]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[2, 0, 2], rotation=[0, -1.570796, 0]),
                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[-2, 0, 2], rotation=[0, 1.570796, 0])]
-
 for plane in room_planes:
     plane.enable_rigidbody(False, collision_shape='BOX', mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
 
@@ -58,6 +48,9 @@ light_plane_material = bproc.material.create('light_material')
 light_point = bproc.types.Light()
 light_point.set_energy(100)
 
+# load cc_textures
+cc_textures = bproc.loader.load_ccmaterials(args.cc_textures_path)
+
 # Define a function that samples 6-DoF poses
 def sample_pose_func(obj: bproc.types.MeshObject):
     min = np.random.uniform([-0.3, -0.3, 0.0], [-0.2, -0.2, 0.0])
@@ -69,12 +62,10 @@ def sample_pose_func(obj: bproc.types.MeshObject):
 bproc.renderer.enable_depth_output(activate_antialiasing=False)
 bproc.renderer.set_max_amount_of_samples(50)
 
-scene_cnt = 0
 for i in range(args.num_scenes):
 
     # Sample bop objects for a scene
-    #sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=15, replace=False))
-    sampled_target_bop_objs = list(np.copy(target_bop_objs))
+    sampled_target_bop_objs = list(np.random.choice(target_bop_objs, size=15, replace=False))
     sampled_distractor_bop_objs = list(np.random.choice(itodd_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(ycbv_dist_bop_objs, size=2, replace=False))
     sampled_distractor_bop_objs += list(np.random.choice(hb_dist_bop_objs, size=2, replace=False))
@@ -92,15 +83,17 @@ for i in range(args.num_scenes):
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
 
-    for idx, obj in enumerate(sampled_distractor_bop_objs):       
+    for obj in (sampled_distractor_bop_objs):        
         mat = obj.get_materials()[0]
         if obj.get_cp("bop_dataset_name") in ['itodd', 'tless']:
             grey_col = np.random.uniform(0.1, 0.9)   
             mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])        
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
+        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 0.5))
+        if obj.get_cp("bop_dataset_name") == 'itodd':  
+            mat.set_principled_shader_value("Metallic", np.random.uniform(0.5, 1.0))
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
+
     
     # Sample two light sources
     light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -117,6 +110,7 @@ for i in range(args.num_scenes):
         plane.replace_materials(random_cc_texture)
 
 
+    # Sample object poses and check collisions 
     bproc.object.sample_poses(objects_to_sample = sampled_target_bop_objs + sampled_distractor_bop_objs,
                             sample_pose_func = sample_pose_func, 
                             max_tries = 1000)
@@ -158,17 +152,14 @@ for i in range(args.num_scenes):
     # Write data in bop format
     bproc.writer.write_bop(os.path.join(args.output_dir, 'bop_data'),
                            target_objects = sampled_target_bop_objs,
-                           dataset = "tless_" + str(num_textures) + "r",
+                           dataset = 'keypose_random_texture',
                            depth_scale = 0.1,
                            depths = data["depth"],
                            colors = data["colors"], 
                            color_file_format = "JPEG",
-                           ignore_dist_thres = 10)
+                           ignore_dist_thres = 10,
+                           append_to_existing_output=True)
     
     for obj in (sampled_target_bop_objs + sampled_distractor_bop_objs):      
         obj.disable_rigidbody()
         obj.hide(True)
-
-    scene_cnt = scene_cnt + 1
-    if scene_cnt == num_textures:
-        scene_cnt = 0

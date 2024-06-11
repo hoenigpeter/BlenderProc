@@ -283,6 +283,7 @@ class _BopWriterUtility:
                                                                local_frame_change=destination_frame))
 
         frame_gt = []
+
         for obj in dataset_objects:
             if isinstance(obj, Link):
                 if not obj.visuals:
@@ -308,7 +309,7 @@ class _BopWriterUtility:
                         'category_id')
                 })
             else:
-                print('ignored obj, ', obj["category_id"], 'because either ')
+                print('ignored obj, ', obj.get_cp("category_id"), 'because either ')
                 print('(1) it is further away than parameter "ignore_dist_thres: ",', ignore_dist_thres)
                 print('(e.g. because it fell through a plane during physics sim)')
                 print('or')
@@ -393,12 +394,11 @@ class _BopWriterUtility:
         # Get ID's of the last already existing chunk and frame.
         curr_chunk_id = 0
         curr_frame_id = 0
-        print(chunk_dirs)
+
         if len(chunk_dirs):
             last_chunk_dir = sorted(chunk_dirs)[-1]
             last_chunk_gt_fpath = os.path.join(last_chunk_dir, 'scene_gt.json')
             chunk_gt = _BopWriterUtility.load_json(last_chunk_gt_fpath, keys_to_int=True)
-            print(chunk_gt)
             # Last chunk and frame ID's.
             last_chunk_id = int(os.path.basename(last_chunk_dir))
             last_frame_id = int(sorted(chunk_gt.keys())[-1])
@@ -444,7 +444,6 @@ class _BopWriterUtility:
 
             # Output translation gt in m or mm
             unit_scaling = 1000. if m2mm else 1.
-
             chunk_gt[curr_frame_id] = _BopWriterUtility.get_frame_gt(dataset_objects, unit_scaling, ignore_dist_thres)
             chunk_camera[curr_frame_id] = _BopWriterUtility.get_frame_camera(save_world2cam, depth_scale, unit_scaling)
 
