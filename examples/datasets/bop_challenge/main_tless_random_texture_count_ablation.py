@@ -22,6 +22,7 @@ bproc.init()
 
 # load cc_textures
 cc_textures = bproc.loader.load_ccmaterials(str(args.cc_textures_path) + "_" + str(num_textures) + "r")
+cc_textures_background = bproc.loader.load_ccmaterials(str(args.cc_textures_path))
 
 # load bop objects into the scene
 target_bop_objs = bproc.loader.load_bop_objs(bop_dataset_path = os.path.join(args.bop_parent_path, 'tless'), model_type = 'cad', mm2m = True)
@@ -112,7 +113,7 @@ for i in range(args.num_scenes):
     light_point.set_location(location)
 
     # sample CC Texture and assign to room planes
-    random_cc_texture = np.random.choice(cc_textures)
+    random_cc_texture = np.random.choice(cc_textures_background)
     for plane in room_planes:
         plane.replace_materials(random_cc_texture)
 
