@@ -16,7 +16,7 @@ for run_id in range(amount_of_runs):
     cmd = ["python", os.path.join(rerun_folder, "cli.py")]
     cmd.extend(used_arguments)
     # the only exception is the output, which gets changed for each run, so that the examples are not overwritten
-    cmd.append(os.path.join(output_location, str(run_id)))
+    #cmd.append(os.path.join(output_location, str(run_id)))
     print(" ".join(cmd))
     # execute one BlenderProc run
     subprocess.call(" ".join(cmd), shell=True)

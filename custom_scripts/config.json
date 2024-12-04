@@ -1,0 +1,10 @@
+{
+    "urdf_file": "resources/hsr/hsr_description/robots/hsrb4s_fixed.urdf",
+    "output_dir": "output/",
+    "shapenet_path": "/ssd3/datasets_bop/shapenetcorev2/models_bop-renderer_scale=0.1",
+    "textures_path": "resources/cc_textures",
+    "dataset_output_path": "dataset/",
+    "dataset_type": "shapenet",
+    "X_size": 640,
+    "Y_size": 480
+}

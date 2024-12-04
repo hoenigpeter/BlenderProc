@@ -1,0 +1,39 @@
+texture_dir: "/home/hoenig/BlenderProc/resources/cc_textures" # path to textures download via "blenderproc download cc_textures"
+output_dir: "/home/hoenig/BlenderProc/custom_scripts/output" #path to result directory
+models_dir: "/ssd3/real_camera_dataset/obj_models_selected/train_selected" #path to fbx files
+dataset_name: "camera_pbr_train" #dataset_name
+num_objects: 15 #number of target objects per scene configuration
+num_scenes: 2000 #40*25=1000 -> change number of total images in run.sh -> restards script every 1000 images -> more stable
+img_per_scene: 25
+
+min_object_scaling: 0.3 
+max_object_scaling: 0.1
+
+cam:
+  height: 480
+  width: 640
+  K:
+    - 572.4114
+    - 0.0
+    - 325.2611
+    - 0.0
+    - 573.57043
+    - 242.04899
+    - 0.0
+    - 0.0
+    - 1.0
+  radius_min: 2
+  radius_max: 2.50 #
+  elevation_min: 15 #5
+  elevation_max: 89
+  sensor_width: 2.7288
+
+distractions:
+  bop_datasets_path: "/home/hoenig/datasets" #pfath to bop dataset can be downloaded at https://bop.felk.cvut.cz/datasets/
+  bop_datasets:
+    # - "lm"
+    # - "tless"
+    - "ycbv"
+  own_distractor_path: None #"distractors"  #None if no own distractors are used, currently only fbx supported
+  num_bop_distractions: 5 #number of distractors per bop dataset
+  max_size: 10 #max size of bop distractors

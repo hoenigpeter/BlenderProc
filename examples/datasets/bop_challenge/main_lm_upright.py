@@ -90,7 +90,6 @@ for i in range(args.num_scenes):
     for plane in room_planes:
         plane.replace_materials(random_cc_texture)
 
-
     # Sample object poses and check collisions 
     bproc.object.sample_poses(objects_to_sample = sampled_target_bop_objs + sampled_distractor_bop_objs,
                             sample_pose_func = sample_pose_func, 

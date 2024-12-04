@@ -10,6 +10,8 @@ output/
 debug/
 resources/AMASS
 resources/cctextures*
+resources/hsr*
+resources/cc_textures*
 resources/scenenet/*zip
 resources/scenenet/SceneNetData
 resources/scenenet/texture*
