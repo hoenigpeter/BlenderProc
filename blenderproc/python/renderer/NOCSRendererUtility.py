@@ -76,7 +76,8 @@ class _NOCSRendererUtility:
         # Scale [-1, 1] to [-0.5, 0.5]
         scale_node = nocs_material.new_node("ShaderNodeVectorMath")
         scale_node.operation = "SCALE"
-        scale_node.inputs[3].default_value = 0.5
+        #scale_node.inputs[3].default_value = 0.5
+        scale_node.inputs[3].default_value = 1.0    # is actually correct
 
         # Move [-0.5, 0.5] to [0, 1]
         add_node = nocs_material.new_node("ShaderNodeVectorMath")
