@@ -1,12 +1,12 @@
-texture_dir: "/home/hoenig/BlenderProc/resources/cc_textures" # path to textures download via "blenderproc download cc_textures"
-output_dir: "/home/hoenig/BlenderProc/custom_scripts/output" #path to result directory
-models_dir: "/ssd3/real_camera_dataset/obj_models_selected/train_selected" #path to fbx files
-dataset_name: "camera_pbr_train_full" #dataset_name
+texture_dir: "/media/ssd2/peter/BlenderProc/resources/cc_textures" # path to textures download via "blenderproc download cc_textures"
+output_dir: "/media/ssd2/peter/BlenderProc/custom_scripts/output2" #path to result directory
+models_dir: "/media/ssd2/peter/datasets/real_camera_dataset/obj_models" #path to fbx files
+dataset_name: "camera_pbr_train_big" #dataset_name
 num_objects: 15 #number of target objects per scene configuration
 num_scenes: 2000 #40*25=1000 -> change number of total images in run.sh -> restards script every 1000 images -> more stable
 img_per_scene: 25
 
-min_object_scaling: 0.3 
+min_object_scaling: 0.3
 max_object_scaling: 0.1
 
 cam:
@@ -29,7 +29,7 @@ cam:
   sensor_width: 2.7288
 
 distractions:
-  bop_datasets_path: "/home/hoenig/datasets" #pfath to bop dataset can be downloaded at https://bop.felk.cvut.cz/datasets/
+  bop_datasets_path: "/media/ssd2/peter/datasets" #pfath to bop dataset can be downloaded at https://bop.felk.cvut.cz/datasets/
   bop_datasets:
     # - "lm"
     # - "tless"

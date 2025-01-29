@@ -61,7 +61,6 @@ def render_nocs(output_dir: Optional[str] = None, file_prefix: str = "nocs_", ou
         return RendererUtility.render(output_dir, file_prefix, output_key, load_keys={output_key},
                                       return_data=return_data, keys_with_alpha_channel={output_key}, verbose=verbose)
 
-
 class _NOCSRendererUtility:
 
     @staticmethod

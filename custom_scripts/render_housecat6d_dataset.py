@@ -15,7 +15,28 @@ import bpy
 import glob
 import json
 
-def set_material_properties(obj, cc_textures, randomize=True):
+class TransparentMaterials: #CHANGE
+    def __init__(self, blend_file_path="TransparentMaterials.blend"):
+        self.materials = {}
+
+        objs = bproc.loader.load_blend(blend_file_path)
+
+        for obj in objs:
+            material = obj.get_materials()[0]
+            name = obj.get_name()
+            if name in self.materials:
+                raise ValueError(f"Material with name {name} already exists.")
+            self.materials[name] = material
+        
+        print(f"Successfully loaded {len(self.materials)} materials")
+
+        bproc.object.delete_multiple(objs)
+        print(self.materials)
+
+    def get_random_material(self):
+        return np.random.choice(list(self.materials.values()))
+
+def set_material_properties(obj, cc_textures, randomize=True, transparent_materials=None):
         if randomize:
             random_cc_texture = np.random.choice(cc_textures)
             obj.replace_materials(random_cc_texture)
@@ -24,11 +45,21 @@ def set_material_properties(obj, cc_textures, randomize=True):
             obj.add_uv_mapping("smart")
 
         mat = obj.get_materials()[0]
-        mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Specular IOR Level", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Metallic", np.random.uniform(0, 1.0))
-        #mat.set_principled_shader_value("Specular", np.random.uniform(0, 1.0))
-        mat.set_principled_shader_value("Alpha", 1.0)
+
+        if obj.get_cp("obj_name") == "glass":
+            obj.replace_materials(transparent_materials.get_random_material())  
+        
+        elif obj.get_cp("obj_name") == "cutlery":
+            mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+            mat.set_principled_shader_value("Specular IOR Level", np.random.uniform(0, 1.0))
+            mat.set_principled_shader_value("Metallic", np.random.uniform(0.3, 1.0))
+            mat.set_principled_shader_value("Alpha", 1.0)
+            grey_col = np.random.uniform(0.1, 0.7)   
+            mat.set_principled_shader_value("Base Color", [grey_col, grey_col, grey_col, 1])   
+        
+        else:
+            mat.set_principled_shader_value("Roughness", np.random.uniform(0, 1.0))
+            mat.set_principled_shader_value("Specular IOR Level", np.random.uniform(0, 1.0)) 
 
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
@@ -82,6 +113,7 @@ def load_meshes(mesh_dir):
                 max_coords = np.max(bbox, axis=0)
                 diagonal = np.linalg.norm(max_coords - min_coords)
                 scaling_factor = (1.0 / diagonal) * 0.1
+                scaling_factor = 1.0
 
                 obj.set_scale([scaling_factor,scaling_factor,scaling_factor])
 
@@ -109,13 +141,8 @@ def render(config):
     mesh_dir = os.path.join(dirname, config["models_dir"])
 
     target_objs = load_meshes(mesh_dir)
-    for obj in target_objs:
-        print(obj.get_materials()[0])
-    
-    print()
-    print(len(target_objs))
-    print(target_objs)
-    print()
+
+    transparent_materials = TransparentMaterials()
 
     dataset_name = config["dataset_name"]
 
@@ -144,10 +171,55 @@ def render(config):
     bproc.renderer.enable_depth_output(activate_antialiasing=False)
     bproc.renderer.set_max_amount_of_samples(50)
 
+    bproc.renderer.set_light_bounces( #CHANGE
+        glossy_bounces=32, 
+        max_bounces=32, 
+        transmission_bounces=32, 
+        transparent_max_bounces=50, 
+        volume_bounces=32)  
+
     bproc.camera.set_intrinsics_from_K_matrix(np.reshape(config["cam"]["K"], (3, 3)), 
                                                 config["cam"]["width"], 
                                                 config["cam"]["height"])
-   
+
+    def sample_initial_pose(obj: bproc.types.MeshObject):
+        obj.set_location(bproc.sampler.upper_region(objects_to_sample_on=room_planes[0:1],
+                                                    min_height=1, max_height=4, face_sample_range=[0.4, 0.6]))
+        #obj.set_rotation_euler(np.random.uniform([0, 0, 0], [0, 0, 0]))
+        #obj.set_rotation_euler([np.pi/2, 0, np.pi/2])
+        initial_rotation = [np.pi/2, 0, np.pi/2]
+        obj.set_rotation_euler(initial_rotation)
+        
+        #obj.set_rotation_euler(np.random.uniform([np.pi/2, 0, np.pi/2], [np.pi/2, 2*np.pi, np.pi/2]))
+        #obj.set_rotation_euler([0,0,0])
+        # rotation_matrix = np.array([
+        #     [0, 0, 1],
+        #     [1, 0, 0],
+        #     [0, 1, 0]
+        # ])
+        # obj.set_rotation_mat(rotation_matrix)
+        # Define a function that samples 6-DoF poses
+            
+        # Step 2: Get the current rotation matrix after applying initial rotation
+        current_rotation_matrix = obj.get_rotation_mat()  # This is a 3x3 rotation matrix
+        
+        # Step 3: Generate a random y-axis rotation (around the new y-axis)
+        random_y_rotation = np.random.uniform(0, 2 * np.pi)
+        
+        # Step 4: Build a random rotation matrix around the y-axis
+        # Using the rotation matrix for a rotation around the y-axis
+        rotation_matrix_y = np.array([
+            [np.cos(random_y_rotation), 0, np.sin(random_y_rotation)],
+            [0, 1, 0],
+            [-np.sin(random_y_rotation), 0, np.cos(random_y_rotation)]
+        ])
+        
+        # Step 5: Combine the current rotation matrix with the random rotation matrix
+        new_rotation_matrix = current_rotation_matrix @ rotation_matrix_y
+        
+        # Step 6: Apply the new combined rotation to the object
+        obj.set_rotation_mat(new_rotation_matrix)
+    
     for i in range(config["num_scenes"]):
 
         # Sample bop objects for a scene
@@ -155,7 +227,7 @@ def render(config):
 
         # Randomize materials and set physics
         for obj in (sampled_target_objs):
-            obj = set_material_properties(obj, cc_textures, randomize=False)
+            obj = set_material_properties(obj, cc_textures, randomize=False, transparent_materials=transparent_materials)
 
         # Sample two light sources
         light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -177,26 +249,26 @@ def render(config):
                                     max_tries = 100)
     
         if i % 2 == 0:   
-            def sample_initial_pose(obj):
-                obj.set_location(bproc.sampler.upper_region(objects_to_sample_on=room_planes[0:1],
-                                                            min_height=1, max_height=4, face_sample_range=[0.4, 0.6]))
-                initial_rotation = [np.pi/2, 0, np.pi/2]
-                obj.set_rotation_euler(initial_rotation)
+            # def sample_initial_pose(obj):
+            #     obj.set_location(bproc.sampler.upper_region(objects_to_sample_on=room_planes[0:1],
+            #                                                 min_height=1, max_height=4, face_sample_range=[0.4, 0.6]))
+            #     initial_rotation = [np.pi/2, 0, np.pi/2]
+            #     obj.set_rotation_euler(initial_rotation)
                 
-                current_rotation_matrix = obj.get_rotation_mat()
+            #     current_rotation_matrix = obj.get_rotation_mat()
                 
-                random_y_rotation = np.random.uniform(0, 2 * np.pi)
-                rotation_matrix_y = np.array([
-                    [np.cos(random_y_rotation), 0, np.sin(random_y_rotation)],
-                    [0, 1, 0],
-                    [-np.sin(random_y_rotation), 0, np.cos(random_y_rotation)]
-                ])
+            #     random_y_rotation = np.random.uniform(0, 2 * np.pi)
+            #     rotation_matrix_y = np.array([
+            #         [np.cos(random_y_rotation), 0, np.sin(random_y_rotation)],
+            #         [0, 1, 0],
+            #         [-np.sin(random_y_rotation), 0, np.cos(random_y_rotation)]
+            #     ])
                 
-                # Step 5: Combine the current rotation matrix with the random rotation matrix
-                new_rotation_matrix = current_rotation_matrix @ rotation_matrix_y
+            #     # Step 5: Combine the current rotation matrix with the random rotation matrix
+            #     new_rotation_matrix = current_rotation_matrix @ rotation_matrix_y
                 
-                # Step 6: Apply the new combined rotation to the object
-                obj.set_rotation_mat(new_rotation_matrix)
+            #     # Step 6: Apply the new combined rotation to the object
+            #     obj.set_rotation_mat(new_rotation_matrix)
 
             bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_objs,
                                                 surface=room_planes[0],

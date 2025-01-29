@@ -66,7 +66,7 @@ def load_meshes(mesh_dir):
     
     for idx, subfolder in enumerate(subfolders):
         subfolder_path = os.path.join(mesh_dir, subfolder)
-        
+        category = []
         # Locate all model.obj files in sub-subfolders
         #model_files = glob.glob(os.path.join(subfolder_path, "**/model.obj"), recursive=True)
         category_folders = sorted(os.listdir(subfolder_path))
@@ -106,8 +106,10 @@ def load_meshes(mesh_dir):
             bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
             bpy.ops.object.mode_set(mode='OBJECT')               
             
-            target_objs.append(obj)
+            category.append(obj)
             i = i + 1
+        
+        target_objs.append(category)
     
     return target_objs
    
@@ -196,7 +198,11 @@ def render(config):
     for i in range(config["num_scenes"]):
 
         # Sample bop objects for a scene
-        sampled_target_objs = list(np.random.choice(target_objs, size=config['num_objects'], replace=False))
+        #sampled_target_objs = list(np.random.choice(target_objs, size=config['num_objects'], replace=False))
+        sampled_target_objs = [
+            obj for sublist in target_objs
+            for obj in np.random.choice(sublist, size=3, replace=False)
+        ]
 
         # Randomize materials and set physics
         for obj in (sampled_target_objs):
