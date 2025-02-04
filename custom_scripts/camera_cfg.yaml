@@ -6,9 +6,6 @@ num_objects: 15 #number of target objects per scene configuration
 num_scenes: 2000 #40*25=1000 -> change number of total images in run.sh -> restards script every 1000 images -> more stable
 img_per_scene: 25
 
-min_object_scaling: 0.3 
-max_object_scaling: 0.1
-
 cam:
   height: 480
   width: 640
@@ -22,9 +19,9 @@ cam:
     - 0.0
     - 0.0
     - 1.0
-  radius_min: 2
-  radius_max: 2.50 #
-  elevation_min: 15 #5
+  radius_min: 0.8
+  radius_max: 1.25 #
+  elevation_min: 5 #5
   elevation_max: 89
   sensor_width: 2.7288
 

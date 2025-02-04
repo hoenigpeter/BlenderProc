@@ -56,6 +56,16 @@ def set_material_properties(obj, cc_textures, randomize=True):
 #     return distractor_objs   
 
 def load_meshes(mesh_dir):
+
+    objects = [
+        {"id": 0, "name": "bottle", "min_diagonal": 0.2, "max_diagonal": 0.25},
+        {"id": 1, "name": "bowl", "min_diagonal": 0.15, "max_diagonal": 0.25},
+        {"id": 2, "name": "camera", "min_diagonal": 0.15, "max_diagonal": 0.25},
+        {"id": 3, "name": "can", "min_diagonal": 0.1, "max_diagonal": 0.2},
+        {"id": 4, "name": "laptop", "min_diagonal": 0.3, "max_diagonal": 0.5},  # Opened laptop
+        {"id": 5, "name": "mug", "min_diagonal": 0.1, "max_diagonal": 0.18}
+    ]
+
     target_objs = []
     # Get the sorted list of subfolders in the mesh_dir
     subfolders = sorted([d for d in os.listdir(mesh_dir) if os.path.isdir(os.path.join(mesh_dir, d))])
@@ -80,7 +90,8 @@ def load_meshes(mesh_dir):
             print(category_id_map[subfolder])
             print()
             obj.set_cp("category_id", i)
-            obj.set_cp("cat_id", str(category_id_map[subfolder]))
+            category_id = category_id_map[subfolder]
+            obj.set_cp("cat_id", str(category_id))
 
             obj.set_cp("obj_name", category_folder)
             
@@ -95,7 +106,12 @@ def load_meshes(mesh_dir):
             min_coords = np.min(bbox, axis=0)
             max_coords = np.max(bbox, axis=0)
             diagonal = np.linalg.norm(max_coords - min_coords)
-            scaling_factor = (1.0 / diagonal) * 0.1
+            print("diagonal: ", diagonal)
+
+            obj_info = objects[category_id]
+            target_diagonal = random.uniform(obj_info["min_diagonal"], obj_info["max_diagonal"])
+            scaling_factor = (target_diagonal / diagonal)
+            print("scaling factor: ", scaling_factor)
 
             obj.set_scale([scaling_factor,scaling_factor,scaling_factor])
 
@@ -114,8 +130,8 @@ def load_meshes(mesh_dir):
     return target_objs
    
 def sample_pose_func(obj: bproc.types.MeshObject):
-        min = np.random.uniform([-0.3, -0.3, 0.0], [-0.2, -0.2, 0.0])
-        max = np.random.uniform([0.2, 0.2, 0.4], [0.3, 0.3, 0.6])
+        min = np.random.uniform([-0.3, -0.3, 0.0], [-0.3, -0.3, 0.0])
+        max = np.random.uniform([0.3, 0.3, 0.4], [0.3, 0.3, 0.6])
         obj.set_location(np.random.uniform(min, max))
         obj.set_rotation_euler(bproc.sampler.uniformSO3())
 
@@ -201,7 +217,7 @@ def render(config):
         #sampled_target_objs = list(np.random.choice(target_objs, size=config['num_objects'], replace=False))
         sampled_target_objs = [
             obj for sublist in target_objs
-            for obj in np.random.choice(sublist, size=3, replace=False)
+            for obj in np.random.choice(sublist, size=2, replace=False)
         ]
 
         # Randomize materials and set physics
@@ -213,8 +229,8 @@ def render(config):
                                         emission_color=np.random.uniform([0.5, 0.5, 0.5, 1.0], [1.0, 1.0, 1.0, 1.0]))  
         light_plane.replace_materials(light_plane_material)
         light_point.set_color(np.random.uniform([0.5,0.5,0.5],[1,1,1]))
-        location = bproc.sampler.shell(center = [0, 0, 0], radius_min = 1, radius_max = 1.5,
-                                elevation_min = 5, elevation_max = 89)
+        location = bproc.sampler.shell(center = [0, 0, 0], radius_min = config["cam"]["radius_min"], radius_max = config["cam"]["radius_max"],
+                                elevation_min = config["cam"]["elevation_min"], elevation_max = config["cam"]["elevation_max"])
         light_point.set_location(location)
 
         # sample CC Texture and assign to room planes
@@ -227,18 +243,18 @@ def render(config):
                                     sample_pose_func = sample_pose_func, 
                                     max_tries = 100)
     
-        if i % 2 == 0:           
-            bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_objs,
-                                                surface=room_planes[0],
-                                                sample_pose_func=sample_initial_pose,
-                                                min_distance=0.01,
-                                                max_distance=0.2)
+        #if i % 2 == 0:           
+        bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_objs,
+                                            surface=room_planes[0],
+                                            sample_pose_func=sample_initial_pose,
+                                            min_distance=0.1,
+                                            max_distance=0.2)
 
-        bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=3,
-                                        max_simulation_time=10,
-                                        check_object_interval=1,
-                                        substeps_per_frame = 20,
-                                        solver_iters=25)
+        # bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=3,
+        #                                 max_simulation_time=10,
+        #                                 check_object_interval=1,
+        #                                 substeps_per_frame = 20,
+        #                                 solver_iters=25)
 
         # BVH tree used for camera obstacle checks
         bop_bvh_tree = bproc.object.create_bvh_tree_multi_objects(sampled_target_objs)
@@ -247,10 +263,11 @@ def render(config):
         while cam_poses < config["img_per_scene"]:
             # Sample location
             location = bproc.sampler.shell(center = [0, 0, 0],
-                                    radius_min = 0.25,
-                                    radius_max = 0.6,
-                                    elevation_min = 5,
-                                    elevation_max = 89)
+                                    radius_min = config["cam"]["radius_min"],
+                                    radius_max = config["cam"]["radius_max"],
+                                    elevation_min = config["cam"]["elevation_min"],
+                                    elevation_max = config["cam"]["elevation_max"])
+            
             # Determine point of interest in scene as the object closest to the mean of a subset of objects
             poi = bproc.object.compute_poi(np.random.choice(sampled_target_objs, size=max(5, len(sampled_target_objs)-1), replace=False)) #
             # Compute rotation based on vector going from location towards poi
