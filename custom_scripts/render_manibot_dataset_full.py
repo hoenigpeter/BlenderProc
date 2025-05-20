@@ -29,81 +29,7 @@ def set_material_properties(obj, cc_textures, randomize=True):
         obj.enable_rigidbody(True, mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
         obj.hide(False)
         return obj
-
-def load_meshes(mesh_dir):
-
-    objects = [
-        {"id": 0, "name": "bottle", "min_diagonal": 0.2, "max_diagonal": 0.25},
-        {"id": 1, "name": "bowl", "min_diagonal": 0.15, "max_diagonal": 0.25},
-        {"id": 2, "name": "camera", "min_diagonal": 0.15, "max_diagonal": 0.25},
-        {"id": 3, "name": "can", "min_diagonal": 0.1, "max_diagonal": 0.2},
-        {"id": 4, "name": "laptop", "min_diagonal": 0.3, "max_diagonal": 0.5},  # Opened laptop
-        {"id": 5, "name": "mug", "min_diagonal": 0.1, "max_diagonal": 0.18}
-    ]
-
-    target_objs = []
-    # Get the sorted list of subfolders in the mesh_dir
-    subfolders = sorted([d for d in os.listdir(mesh_dir) if os.path.isdir(os.path.join(mesh_dir, d))])
-    
-    # Map subfolder names to category IDs based on their sorted index
-    category_id_map = {subfolder: idx for idx, subfolder in enumerate(subfolders)}
-    i = 0
-    
-    for idx, subfolder in enumerate(subfolders):
-        subfolder_path = os.path.join(mesh_dir, subfolder)
-        category = []
-        # Locate all model.obj files in sub-subfolders
-        #model_files = glob.glob(os.path.join(subfolder_path, "**/model.obj"), recursive=True)
-        category_folders = sorted(os.listdir(subfolder_path))
-        print(category_folders)
-        
-        for idx_cat, category_folder in enumerate(category_folders):
-            category_path = subfolder_path + "/" + category_folder
-            
-            obj = bproc.loader.load_obj(category_path + "/model.obj")[0]
-            print(i)
-            print(category_id_map[subfolder])
-            print()
-            obj.set_cp("category_id", i)
-            category_id = category_id_map[subfolder]
-            obj.set_cp("cat_id", str(category_id))
-
-            obj.set_cp("obj_name", category_folder)
-            
-            obj.set_name(category_folder)
-            # print(category_folder)
-            # print(category_id_map[subfolder])
-            # print()
-            
-            obj.hide(True)
-            obj.set_shading_mode('auto')
-            bbox = obj.get_bound_box()
-            min_coords = np.min(bbox, axis=0)
-            max_coords = np.max(bbox, axis=0)
-            diagonal = np.linalg.norm(max_coords - min_coords)
-            print("diagonal: ", diagonal)
-
-            obj_info = objects[category_id]
-            target_diagonal = random.uniform(obj_info["min_diagonal"], obj_info["max_diagonal"])
-            scaling_factor = (target_diagonal / diagonal)
-            print("scaling factor: ", scaling_factor)
-
-            obj.set_scale([scaling_factor,scaling_factor,scaling_factor])
-
-            # Apply scale and ensure quads are converted to tris
-            bpy.context.view_layer.objects.active = obj.blender_obj
-            bpy.ops.object.mode_set(mode='EDIT')
-            bpy.ops.mesh.select_all(action='SELECT')
-            bpy.ops.mesh.quads_convert_to_tris(quad_method='BEAUTY', ngon_method='BEAUTY')
-            bpy.ops.object.mode_set(mode='OBJECT')               
-            
-            category.append(obj)
-            i = i + 1
-        
-        target_objs.append(category)
-    
-    return target_objs
-   
+  
 def sample_pose_func(obj: bproc.types.MeshObject):
         min = np.random.uniform([-0.3, -0.3, 0.0], [-0.3, -0.3, 0.0])
         max = np.random.uniform([0.3, 0.3, 0.4], [0.3, 0.3, 0.6])
@@ -113,18 +39,22 @@ def sample_pose_func(obj: bproc.types.MeshObject):
 def render(config):
 
     bproc.init()
-    mesh_dir = os.path.join(dirname, config["models_dir"])
+    bop_parent_path = "/ssd3/datasets_bop"
 
-    target_objs = load_meshes(mesh_dir)
+    target_objs = bproc.loader.load_bop_objs(
+        bop_dataset_path=os.path.join(bop_parent_path, 'manibot'),
+        model_type="cad", object_model_unit='m'
+    )
 
     dataset_name = config["dataset_name"]
 
     # create room
-    room_planes = [bproc.object.create_primitive('PLANE', scale=[2, 2, 1]),
-                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[0, -2, 2], rotation=[-1.570796, 0, 0]),
-                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[0, 2, 2], rotation=[1.570796, 0, 0]),
-                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[2, 0, 2], rotation=[0, -1.570796, 0]),
-                bproc.object.create_primitive('PLANE', scale=[2, 2, 1], location=[-2, 0, 2], rotation=[0, 1.570796, 0])]
+    room_size = max(config["cam"]["radius_max"] * 1.1, 6)
+    room_planes = [bproc.object.create_primitive('PLANE', scale=[room_size, room_size, 1]),
+                bproc.object.create_primitive('PLANE', scale=[room_size, room_size, 1], location=[0, -room_size, room_size], rotation=[-1.570796, 0, 0]),
+                bproc.object.create_primitive('PLANE', scale=[room_size, room_size, 1], location=[0, room_size, room_size], rotation=[1.570796, 0, 0]),
+                bproc.object.create_primitive('PLANE', scale=[room_size, room_size, 1], location=[room_size, 0, room_size], rotation=[0, -1.570796, 0]),
+                bproc.object.create_primitive('PLANE', scale=[room_size, room_size, 1], location=[-room_size, 0, room_size], rotation=[0, 1.570796, 0])]
     for plane in room_planes:
         plane.enable_rigidbody(False, collision_shape='BOX', mass=1.0, friction = 100.0, linear_damping = 0.99, angular_damping = 0.99)
 
@@ -135,7 +65,7 @@ def render(config):
 
     # sample point light on shell
     light_point = bproc.types.Light()
-    light_point.set_energy(100)
+
 
     # load cc_textures
     cc_textures = bproc.loader.load_ccmaterials(config['texture_dir'])
@@ -190,14 +120,24 @@ def render(config):
 
         # Sample bop objects for a scene
         #sampled_target_objs = list(np.random.choice(target_objs, size=config['num_objects'], replace=False))
-        sampled_target_objs = [
-            obj for sublist in target_objs
-            for obj in np.random.choice(sublist, size=2, replace=False)
-        ]
+        sampled_target_objs = list(np.random.choice(target_objs, size=15, replace=False))
+
+        light_point.set_energy(random.uniform(config["light_energy_max"], config["light_energy_min"]))
 
         # Randomize materials and set physics
         for obj in (sampled_target_objs):
-            obj = set_material_properties(obj, cc_textures, randomize=False)
+            obj = set_material_properties(obj, cc_textures, randomize=True)
+
+            bbox = obj.get_bound_box()
+            min_coords = np.min(bbox, axis=0)
+            max_coords = np.max(bbox, axis=0)
+            diagonal = np.linalg.norm(max_coords - min_coords)
+
+            target_diagonal = random.uniform(config["max_object_scaling"], config["min_object_scaling"])
+            scaling_factor = (target_diagonal / diagonal)
+            print("scaling factor: ", scaling_factor)
+
+            obj.set_scale([scaling_factor,scaling_factor,scaling_factor])
 
         # Sample two light sources
         light_plane_material.make_emissive(emission_strength=np.random.uniform(3,6), 
@@ -218,12 +158,12 @@ def render(config):
                                     sample_pose_func = sample_pose_func, 
                                     max_tries = 100)
     
-        if i % 2 == 0:           
-            bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_objs,
-                                                surface=room_planes[0],
-                                                sample_pose_func=sample_initial_pose,
-                                                min_distance=0.1,
-                                                max_distance=0.2)
+        # if i % 2 == 0:           
+        #     bproc.object.sample_poses_on_surface(objects_to_sample=sampled_target_objs,
+        #                                         surface=room_planes[0],
+        #                                         sample_pose_func=sample_initial_pose,
+        #                                         min_distance=0.1,
+        #                                         max_distance=0.2)
 
         bproc.object.simulate_physics_and_fix_final_poses(min_simulation_time=3,
                                         max_simulation_time=10,
@@ -272,7 +212,7 @@ def render(config):
         # Write data in bop format
         bproc.writer.write_bop_with_nocs(os.path.join(config["output_dir"], 'bop_data'),
                             target_objects = sampled_target_objs,
-                            dataset = dataset_name,
+                            dataset = "manibot_poop",
                             depth_scale = 0.1,
                             depths = data["depth"],
                             colors = data["colors"],
@@ -287,12 +227,13 @@ def render(config):
             obj.hide(True)
 
 if __name__ == "__main__":
-    config_path = "./camera_cfg.yaml"
+    config_path = "./manibot_cfg.yaml"
 
     dirname = os.path.dirname(__file__) #TODO
 
     with open(os.path.join(dirname, config_path), "r") as stream:
         config = yaml.safe_load(stream)
+
     render(config)
 
 

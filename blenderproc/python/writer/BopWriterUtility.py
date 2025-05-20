@@ -689,17 +689,32 @@ class _BopWriterUtility:
             # ignore examples that fell through the plane
             if not np.linalg.norm(list(cam_t_m2c)) > ignore_dist_thres:
                 cam_t_m2c = list(cam_t_m2c * unit_scaling)
-                frame_gt.append({
+
+                frame_entry = {
                     'cam_R_m2c': list(cam_R_m2c[0]) + list(cam_R_m2c[1]) + list(cam_R_m2c[2]),
                     'cam_t_m2c': cam_t_m2c,
-                    'obj_id': obj.get_cp("category_id") if not isinstance(obj, Link) else obj.visuals[0].get_cp(
-                        'category_id'),
-                    'obj_name': obj.get_cp("obj_name") if not isinstance(obj, Link) else obj.visuals[0].get_cp(
-                        'obj_name'),
-                    'category_id': obj.get_cp("cat_id") if not isinstance(obj, Link) else obj.visuals[0].get_cp(
-                        'cat_id'),
-                })
-                
+                    'obj_id': obj.get_cp("category_id") if not isinstance(obj, Link) else obj.visuals[0].get_cp("category_id"),
+                }
+
+                # Safe check for obj_name
+                if not isinstance(obj, Link):
+                    if "obj_name" in obj.blender_obj:
+                        frame_entry['obj_name'] = obj.get_cp("obj_name")
+                else:
+                    if "obj_name" in obj.visuals[0].blender_obj:
+                        frame_entry['obj_name'] = obj.visuals[0].get_cp("obj_name")
+
+                # Safe check for cat_id
+                if not isinstance(obj, Link):
+                    if "cat_id" in obj.blender_obj:
+                        frame_entry['category_id'] = obj.get_cp("cat_id")
+                else:
+                    if "cat_id" in obj.visuals[0].blender_obj:
+                        frame_entry['category_id'] = obj.visuals[0].get_cp("cat_id")
+
+                frame_gt.append(frame_entry)
+
+                                
             else:
                 print('ignored obj, ', obj.get_cp("category_id"), 'because either ')
                 print('(1) it is further away than parameter "ignore_dist_thres: ",', ignore_dist_thres)
@@ -817,6 +832,9 @@ class _BopWriterUtility:
 
             nocs_rgb = nocs[frame_id]
             nocs_rgb = nocs_rgb[..., :3]
+            print("MAX: ", np.max(nocs_rgb))
+            print("MIN: ", np.min(nocs_rgb))
+            print()
             nocs_normalized = np.clip(nocs_rgb, 0, 1)
             nocs_bgr = (nocs_normalized * 255).astype(np.uint8)[..., ::-1]
 

@@ -1,7 +1,7 @@
 texture_dir: "/media/ssd2/peter/BlenderProc/resources/cc_textures" # path to textures download via "blenderproc download cc_textures"
 output_dir: "/media/ssd2/peter/BlenderProc/custom_scripts/output" #path to result directory
-models_dir: "/media/ssd2/peter/obj_models_selected/train_selected" #path to fbx files
-dataset_name: "camera_pbr_train_big" #dataset_name
+models_dir: "/media/ssd2/peter/obj_models/train" #path to fbx files
+dataset_name: "camera_pbr_full_object_pool" #dataset_name
 num_objects: 15 #number of target objects per scene configuration
 num_scenes: 2000 #40*25=1000 -> change number of total images in run.sh -> restards script every 1000 images -> more stable
 img_per_scene: 25
