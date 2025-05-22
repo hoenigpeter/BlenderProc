@@ -236,27 +236,16 @@ def render(output_directory, num):
             visib_frac = obj_entry["visib_fract"]
             mask = masks[idx]
 
-
             print("idx: ", idx)
             print("unique_id: ", unique_id)
             print("visib_fract: ", visib_frac)
         
-
-        # nocs_rgb = data['nocs'][0][..., :3]
-        # nocs_bgr = (np.clip(nocs_rgb, 0, 1) * 255).astype(np.uint8)[..., ::-1]
-        # output_path = os.path.join(output_directory, f"{inst_id}.nocs.png")
-        # cv2.imwrite(output_path, nocs_bgr)
-
         if view_id == 19:
             # Clean up for next scene
             for obj in scene_objs:
                 obj.hide(True)
                 obj.delete()
             scene_objs = []
-
-        #     instance_ids = []
-
-        #     bproc.clean_up()
 
         break
 
@@ -280,6 +269,3 @@ if __name__ == "__main__":
 
         dirname = os.path.dirname(__file__)
         render(output_dir, num)
-        # add_nocs_images_to_tar(f"/hdd/megapose_shapenet/{num:08d}.tar", output_dir + "/" + f"{num:08d}")
-        # shutil.rmtree(output_dir)
-        # print(f"Temporary directory '{output_dir}' removed.")
